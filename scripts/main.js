@@ -2,7 +2,8 @@ import {
 	apiToken,
 	MATERIAL_USER_NAME,
 	oneMatrixPerScene,
-	WORKING_DIR_UUID
+	WORKING_DIR_UUID,
+	devSceneUUID
 } from "../config.js";
 
 import {
@@ -79,7 +80,10 @@ async function initApp() {
 
 		await grantAccessToFolder(WORKING_DIR_UUID, "users", userID, "manage");
 
-		if (oneMatrixPerScene) {
+		if (devSceneUUID !== undefined) {
+			sceneUUID = devSceneUUID;
+		}
+		else if (oneMatrixPerScene) {
 			const scene = await (await createAsset(WORKING_DIR_UUID, "scene", "DummyScene")).json();
 			sceneUUID = scene.asset_id;
 		}
@@ -115,15 +119,15 @@ async function createMatrix()
 	const previewMeshUUID = "9b3910bc-1b6a-4285-8f71-8656bd507ffc";
 
 	entityTemplate.attachComponent('mesh_ref', {value: previewMeshUUID});
-	//entityTemplate.attachComponent('material');
+	entityTemplate.attachComponent('material', {shaderRef: "744556b0-67b5-4329-ba4f-a04c04f92b1c", dataJSON: {albedo: [1,0,0], roughness:0.5, metallic:0.5}});
 
 	const size = 5;
 	const distance = 2.0;
 
+	/*
 	let templates = new Array(size * size).fill(entityTemplate);
-	console.log(templates);
-
 	let entities = await SDK3DVerse.engineAPI.instantiateEntities(null, templates);
+	*/
 
 	for (let i = 0; i < size; i++) {
 		let roughness = i / (size - 1);
@@ -131,7 +135,7 @@ async function createMatrix()
 		for (let j = 0; j < size; j++) {
 			let metalness = j / (size - 1);
 
-			let entity = entities[i * size + j];
+			let entity = await entityTemplate.instantiateTransientEntity(`mat_${i}_${j}`, null, true);
 
 			entity.setGlobalTransform({
 				position: [(j - (size * 0.5) + 0.5) * distance, 0, (i - (size * 0.5) + 0.5) * distance],
@@ -139,10 +143,10 @@ async function createMatrix()
 				scale: [1, 1, 1]
 			});
 
-			const material = entity.getComponent("material");
-			material.shaderRef = "744556b0-67b5-4329-ba4f-a04c04f92b1c";
-			material.constantsJSON.roughness = roughness;
-			entity.setComponent("material", material);
+			const material = entity.getComponent('material');
+			material.dataJSON.roughness = roughness;
+			material.dataJSON.metallic = metalness;
+			entity.setComponent('material', material);
 		}
 	}
 }
