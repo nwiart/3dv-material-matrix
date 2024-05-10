@@ -1,5 +1,5 @@
 
-export const apiToken = "7e06c2bb-c9ac-44ce-bca7-6248121799fd.XvE1xcI25tBq6ROR5SGJW5CgU_q7QgHprf-kpDqAscw";
+export const apiToken = "";
 
 // Replace asset UUIDs:
 // - Go to the Asset Browser page.
