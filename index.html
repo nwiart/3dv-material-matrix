@@ -1,0 +1,24 @@
+<html>
+    <head>
+        <meta charset="UTF-8" />
+        <meta content="width=device-width,initial-scale=1.0" name="viewport" />
+    </head>
+
+    <body style="margin: 0">
+        <div class="canvas-container">
+        <!-- CANVAS -->
+        <canvas
+            id="display-canvas"
+            oncontextmenu="event.preventDefault()"
+            style="width: 100vw; height: 100vh;"
+            tabindex="1"
+        ></canvas>
+        </div>
+
+        <!-- LIVELINK SDK -->
+        <script src="https://cdn.3dverse.com/legacy/sdk/stable/SDK3DVerse.js"></script>
+
+        <!-- PROJECT ENTRYPOINT -->
+        <script src="./scripts/main.js" type="module"></script>
+    </body>
+</html>
