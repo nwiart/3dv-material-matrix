@@ -56,30 +56,29 @@ async function initApp() {
 		if (devSceneUUID !== undefined) {
 			await withSession(userToken, devSceneUUID, async () => {
 				await createMatrix(shaders[0].shaderUUID, false);
-			});
+			}, true);
 		}
 		// Generate all matrices in one scene.
 		else if (!oneMatrixPerScene) {
 			const scene = await (await createAsset(WORKING_DIR_UUID, "scene", "All Materials")).json();
 
 			await withSession(userToken, scene.asset_id, async () => {
-				await createMatrix(shaders[0].shaderUUID, false);
+				shaders.forEach(async (shader) => {
+					await createMatrix(shaders[0].shaderUUID, false);
+					await createMatrix(shaders[0].shaderUUID, true);
+				});
 			});
 		}
 		// Generate one scene per matrix.
 		else {
 			shaders.forEach(async (shader) => {
-				const scene = await (await createAsset(WORKING_DIR_UUID, "scene", shader.sceneName)).json();
+				const sceneNormal = await (await createAsset(WORKING_DIR_UUID, "scene", shader.sceneName)).json();
+				const sceneTriplanar = await (await createAsset(WORKING_DIR_UUID, "scene", shader.sceneName + " Triplanar")).json();
 
-				await withSession(userToken, scene.asset_id, async () => {
+				await withSession(userToken, sceneNormal.asset_id, async () => {
 					await createMatrix(shader.shaderUUID, false);
 				});
-			});
-
-			shaders.forEach(async (shader) => {
-				const scene = await (await createAsset(WORKING_DIR_UUID, "scene", shader.sceneName + " Triplanar")).json();
-
-				await withSession(userToken, scene.asset_id, async () => {
+				await withSession(userToken, sceneTriplanar.asset_id, async () => {
 					await createMatrix(shader.shaderUUID, true);
 				});
 			});
@@ -92,7 +91,7 @@ async function initApp() {
 }
 
 
-async function withSession(userToken, sceneUUID, callback)
+async function withSession(userToken, sceneUUID, callback, noDisconnect=false)
 {
 	await SDK3DVerse.joinOrStartSession({
 		userToken: userToken,
@@ -105,7 +104,9 @@ async function withSession(userToken, sceneUUID, callback)
 
 	await callback();
 
-	await SDK3DVerse.disconnectFromSession();
+	if (!noDisconnect) {
+		await SDK3DVerse.disconnectFromSession();
+	}
 }
 
 // Generates a matrix of meshes in the current open scene.
