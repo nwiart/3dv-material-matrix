@@ -55,6 +55,20 @@ async function createAsset(folder_id, asset_type, asset_name) {
 }
 
 
+// List of all four shaders (standard, sheen, anisotropic, clearcoat) in their textured and non-textured variants.
+// Triplanar variants are generated via code below.
+const shaders = [
+	{ shaderUUID: "744556b0-67b5-4329-ba4f-a04c04f92b1c", sceneName: "Standard Untextured" },
+	{ shaderUUID: "723b3aa5-cc92-4897-9830-92eb89dbae03", sceneName: "Standard Textured" },
+	{ shaderUUID: "9d07f1f4-5442-4a65-b58c-509528f33ab3", sceneName: "Sheen Untextured" },
+	{ shaderUUID: "1dfc716d-9df7-438d-8290-0ebccc3927af", sceneName: "Sheen Textured" },
+	{ shaderUUID: "b2793b09-8ba7-4667-8e4d-4730caf62b36", sceneName: "Anisotropy Untextured" },
+	{ shaderUUID: "8e4a2dda-84e7-43f7-b868-bd71a32f590b", sceneName: "Anisotropy Textured" },
+	{ shaderUUID: "b3df43be-3a64-44e5-a665-327e5e572c10", sceneName: "ClearCoat Untextured" },
+	{ shaderUUID: "28fa4cca-a9f0-4f29-9f01-048c29611da6", sceneName: "ClearCoat Textured" },
+];
+
+
 window.addEventListener("load", initApp);
 
 async function initApp() {
@@ -107,11 +121,12 @@ async function initApp() {
 	});
 
 
-	createMatrix();
+	createMatrix(shaders[0].shaderUUID);
 }
 
 
-async function createMatrix()
+// Generates a matrix of meshes in the current open scene.
+async function createMatrix(shaderUUID)
 {
 	const entityTemplate = new SDK3DVerse.EntityTemplate();
 
@@ -119,7 +134,7 @@ async function createMatrix()
 	const previewMeshUUID = "9b3910bc-1b6a-4285-8f71-8656bd507ffc";
 
 	entityTemplate.attachComponent('mesh_ref', {value: previewMeshUUID});
-	entityTemplate.attachComponent('material', {shaderRef: "744556b0-67b5-4329-ba4f-a04c04f92b1c", dataJSON: {albedo: [1,0,0], roughness:0.5, metallic:0.5}});
+	entityTemplate.attachComponent('material', {shaderRef: shaderUUID, dataJSON: {albedo: [1,0,0], roughness:0.5, metallic:0.5}});
 
 	const size = 5;
 	const distance = 2.0;
