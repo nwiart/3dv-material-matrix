@@ -35,43 +35,65 @@ window.addEventListener("load", initApp);
 async function initApp() {
 	let userID = null;
 	let userToken = null;
-	let sceneUUID = null;
 
 	try {
-		const usersResponse = await listUsers();
-		const users = await usersResponse.json();
+		// Find material generator user, or create one if there's none yet.
+		const users = await (await listUsers()).json();
 
 		let materialUser = users.find((e) => e.username == MATERIAL_USER_NAME);
 		if (materialUser === undefined) {
-			const registerResponse = await registerUser(MATERIAL_USER_NAME);
-			materialUser = await registerResponse.json();
+			materialUser = await (await registerUser(MATERIAL_USER_NAME)).json();
 		}
-
 		userID = materialUser.user_id;
 
+		// Create a user token and grant access to working folder.
 		let token = await (await generateUserToken(userID, "5m")).json();
-
 		userToken = token.user_token;
 
 		await grantAccessToFolder(WORKING_DIR_UUID, "users", userID, "manage");
 
+		// Development scene (script testing).
 		if (devSceneUUID !== undefined) {
-			sceneUUID = devSceneUUID;
+			await withSession(userToken, devSceneUUID, async () => {
+				await createMatrix(shaders[0].shaderUUID, false);
+			});
 		}
-		else if (oneMatrixPerScene) {
-			const scene = await (await createAsset(WORKING_DIR_UUID, "scene", "DummyScene")).json();
-			sceneUUID = scene.asset_id;
+		// Generate all matrices in one scene.
+		else if (!oneMatrixPerScene) {
+			const scene = await (await createAsset(WORKING_DIR_UUID, "scene", "All Materials")).json();
+
+			await withSession(userToken, scene.asset_id, async () => {
+				await createMatrix(shaders[0].shaderUUID, false);
+			});
 		}
+		// Generate one scene per matrix.
 		else {
-			const scene = await (await createAsset(WORKING_DIR_UUID, "scene", "DummyScene")).json();
-			sceneUUID = scene.asset_id;
+			shaders.forEach(async (shader) => {
+				const scene = await (await createAsset(WORKING_DIR_UUID, "scene", shader.sceneName)).json();
+
+				await withSession(userToken, scene.asset_id, async () => {
+					await createMatrix(shader.shaderUUID, false);
+				});
+			});
+
+			shaders.forEach(async (shader) => {
+				const scene = await (await createAsset(WORKING_DIR_UUID, "scene", shader.sceneName + " Triplanar")).json();
+
+				await withSession(userToken, scene.asset_id, async () => {
+					await createMatrix(shader.shaderUUID, true);
+				});
+			});
 		}
 
 	} catch (err) {
 		console.log(err);
 		return;
 	}
+}
 
+
+async function withSession(userToken, sceneUUID, callback)
+{
 	await SDK3DVerse.joinOrStartSession({
 		userToken: userToken,
 		sceneUUID: sceneUUID,
@@ -81,10 +103,10 @@ async function initApp() {
 		},
 	});
 
+	await callback();
 
-	createMatrix(shaders[0].shaderUUID);
+	await SDK3DVerse.disconnectFromSession();
 }
-
 
 // Generates a matrix of meshes in the current open scene.
 async function createMatrix(shaderUUID, triplanar)
@@ -95,7 +117,7 @@ async function createMatrix(shaderUUID, triplanar)
 	const previewMeshUUID = "9b3910bc-1b6a-4285-8f71-8656bd507ffc";
 
 	entityTemplate.attachComponent('mesh_ref', {value: previewMeshUUID});
-	entityTemplate.attachComponent('material', {shaderRef: shaderUUID, dataJSON: {albedo: [1,0,0], roughness:0.5, metallic:0.5}, constantsJSON: {"MATERIAL_TRIPLANAR": true}});
+	entityTemplate.attachComponent('material', {shaderRef: shaderUUID, dataJSON: {albedo: [1,0,0], roughness:0.5, metallic:0.5}, constantsJSON: {"MATERIAL_TRIPLANAR": triplanar}});
 
 	const size = 5;
 	const distance = 2.0;
