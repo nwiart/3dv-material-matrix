@@ -1,4 +1,8 @@
 import {
+	apiToken
+} from "../config.js"
+
+import {
 	get,
 	post,
 	del,

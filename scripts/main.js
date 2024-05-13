@@ -1,5 +1,4 @@
 import {
-	apiToken,
 	MATERIAL_USER_NAME,
 	oneMatrixPerScene,
 	WORKING_DIR_UUID,
@@ -16,8 +15,6 @@ import {
 
 
 
-
-
 // List of all four shaders (standard, sheen, anisotropic, clearcoat) in their textured and non-textured variants.
 // Triplanar variants are generated via code below.
 const shaders = [
@@ -30,6 +27,7 @@ const shaders = [
 	{ shaderUUID: "b3df43be-3a64-44e5-a665-327e5e572c10", sceneName: "ClearCoat Untextured" },
 	{ shaderUUID: "28fa4cca-a9f0-4f29-9f01-048c29611da6", sceneName: "ClearCoat Textured" },
 ];
+
 
 
 window.addEventListener("load", initApp);
@@ -89,7 +87,7 @@ async function initApp() {
 
 
 // Generates a matrix of meshes in the current open scene.
-async function createMatrix(shaderUUID)
+async function createMatrix(shaderUUID, triplanar)
 {
 	const entityTemplate = new SDK3DVerse.EntityTemplate();
 
@@ -97,7 +95,7 @@ async function createMatrix(shaderUUID)
 	const previewMeshUUID = "9b3910bc-1b6a-4285-8f71-8656bd507ffc";
 
 	entityTemplate.attachComponent('mesh_ref', {value: previewMeshUUID});
-	entityTemplate.attachComponent('material', {shaderRef: shaderUUID, dataJSON: {albedo: [1,0,0], roughness:0.5, metallic:0.5}});
+	entityTemplate.attachComponent('material', {shaderRef: shaderUUID, dataJSON: {albedo: [1,0,0], roughness:0.5, metallic:0.5}, constantsJSON: {"MATERIAL_TRIPLANAR": true}});
 
 	const size = 5;
 	const distance = 2.0;
