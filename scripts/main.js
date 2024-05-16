@@ -1,8 +1,13 @@
 import {
-	MATERIAL_USER_NAME,
+	materialUserName,
 	oneMatrixPerScene,
-	WORKING_DIR_UUID,
-	devSceneUUID
+	shaders,
+	workingDirUUID,
+	matrixMeshUUID,
+	devSceneUUID,
+	matrixSize,
+	matrixSpacing,
+	matrixDistance
 } from "../config.js";
 
 import {
@@ -14,20 +19,7 @@ import {
 } from "./api_calls.js";
 
 
-
-// List of all four shaders (standard, sheen, anisotropic, clearcoat) in their textured and non-textured variants.
-// Triplanar variants are generated via code below.
-const shaders = [
-	{ shaderUUID: "744556b0-67b5-4329-ba4f-a04c04f92b1c", sceneName: "Standard Untextured" },
-	{ shaderUUID: "723b3aa5-cc92-4897-9830-92eb89dbae03", sceneName: "Standard Textured" },
-	{ shaderUUID: "9d07f1f4-5442-4a65-b58c-509528f33ab3", sceneName: "Sheen Untextured" },
-	{ shaderUUID: "1dfc716d-9df7-438d-8290-0ebccc3927af", sceneName: "Sheen Textured" },
-	{ shaderUUID: "b2793b09-8ba7-4667-8e4d-4730caf62b36", sceneName: "Anisotropy Untextured" },
-	{ shaderUUID: "8e4a2dda-84e7-43f7-b868-bd71a32f590b", sceneName: "Anisotropy Textured" },
-	{ shaderUUID: "b3df43be-3a64-44e5-a665-327e5e572c10", sceneName: "ClearCoat Untextured" },
-	{ shaderUUID: "28fa4cca-a9f0-4f29-9f01-048c29611da6", sceneName: "ClearCoat Textured" },
-];
-
+const delay = ms => new Promise(res => setTimeout(res, ms));
 
 
 window.addEventListener("load", initApp);
@@ -40,9 +32,9 @@ async function initApp() {
 		// Find material generator user, or create one if there's none yet.
 		const users = await (await listUsers()).json();
 
-		let materialUser = users.find((e) => e.username == MATERIAL_USER_NAME);
+		let materialUser = users.find((e) => e.username == materialUserName);
 		if (materialUser === undefined) {
-			materialUser = await (await registerUser(MATERIAL_USER_NAME)).json();
+			materialUser = await (await registerUser(materialUserName)).json();
 		}
 		userID = materialUser.user_id;
 
@@ -50,38 +42,72 @@ async function initApp() {
 		let token = await (await generateUserToken(userID, "5m")).json();
 		userToken = token.user_token;
 
-		await grantAccessToFolder(WORKING_DIR_UUID, "users", userID, "manage");
+		await grantAccessToFolder(workingDirUUID, "users", userID, "manage");
 
 		// Development scene (script testing).
 		if (devSceneUUID !== undefined) {
 			await withSession(userToken, devSceneUUID, async () => {
-				await createMatrix(shaders[0].shaderUUID, false);
+				await createMatrix(shaders[0].shaderUUID, [0, 0, 0], false);
 			}, true);
 		}
 		// Generate all matrices in one scene.
 		else if (!oneMatrixPerScene) {
-			const scene = await (await createAsset(WORKING_DIR_UUID, "scene", "All Materials")).json();
+			const scene = await (await createAsset(workingDirUUID, "scene", "All Materials")).json();
 
-			await withSession(userToken, scene.asset_id, async () => {
-				shaders.forEach(async (shader) => {
-					await createMatrix(shaders[0].shaderUUID, false);
-					await createMatrix(shaders[0].shaderUUID, true);
-				});
+			await delay(8000);
+
+			await SDK3DVerse.joinOrStartSession({
+				userToken: userToken,
+				sceneUUID: scene.asset_id,
+				canvas: document.getElementById("display-canvas"),
+				viewportProperties: {
+					defaultControllerType: SDK3DVerse.controller_type.orbit,
+				},
 			});
+			//await withSession(userToken, scene.asset_id, async () => {
+				const positionOffset = [0, 0, 0];
+				shaders.forEach(async (shader) => {
+					await createMatrix(shader.shaderUUID, positionOffset, false);
+					positionOffset[0] += matrixSize * matrixSpacing + matrixDistance;
+					await createMatrix(shader.shaderUUID, positionOffset, true);
+					positionOffset[0] += matrixSize * matrixSpacing + matrixDistance;
+				});
+			//});
+
+			await SDK3DVerse.disconnectFromSession();
 		}
 		// Generate one scene per matrix.
 		else {
-			shaders.forEach(async (shader) => {
-				const sceneNormal = await (await createAsset(WORKING_DIR_UUID, "scene", shader.sceneName)).json();
-				const sceneTriplanar = await (await createAsset(WORKING_DIR_UUID, "scene", shader.sceneName + " Triplanar")).json();
+			console.log("Starting one matrix per scene generation...");
 
-				await withSession(userToken, sceneNormal.asset_id, async () => {
-					await createMatrix(shader.shaderUUID, false);
+			for (const shader of shaders) {
+				console.log(`Shader \"${shader.sceneName}\"`);
+
+				const sceneNormal = await (await createAsset(workingDirUUID, "scene", shader.sceneName)).json();
+				//const sceneTriplanar = await (await createAsset(workingDirUUID, "scene", shader.sceneName + " Triplanar")).json();
+
+				// Wait before joining the new scene.
+				await delay(3000);
+
+				await SDK3DVerse.joinOrStartSession({
+					userToken: userToken,
+					sceneUUID: sceneNormal.asset_id,
+					canvas: document.getElementById("display-canvas"),
+					viewportProperties: {
+						defaultControllerType: SDK3DVerse.controller_type.orbit,
+					},
 				});
+				//await withSession(userToken, sceneNormal.asset_id, async () => {
+					await createMatrix(shader.shaderUUID, [0, 0, 0], false);
+				//});
+
+				await SDK3DVerse.disconnectFromSession();
+
+				/*await delay(2000);
 				await withSession(userToken, sceneTriplanar.asset_id, async () => {
-					await createMatrix(shader.shaderUUID, true);
-				});
-			});
+					await createMatrix(shader.shaderUUID, [0, 0, 0], true);
+				});*/
+			}
 		}
 
 	} catch (err) {
@@ -110,42 +136,32 @@ async function withSession(userToken, sceneUUID, callback, noDisconnect=false)
 }
 
 // Generates a matrix of meshes in the current open scene.
-async function createMatrix(shaderUUID, triplanar)
+async function createMatrix(shaderUUID, positionOffset, triplanar)
 {
-	const entityTemplate = new SDK3DVerse.EntityTemplate();
+	let templates = [];
+	for (let i = 0; i < matrixSize; i++) {
+		let roughness = i / (matrixSize - 1);
 
-	// Sphere mesh.
-	const previewMeshUUID = "9b3910bc-1b6a-4285-8f71-8656bd507ffc";
+		for (let j = 0; j < matrixSize; j++) {
+			let metallic = j / (matrixSize - 1);
 
-	entityTemplate.attachComponent('mesh_ref', {value: previewMeshUUID});
-	entityTemplate.attachComponent('material', {shaderRef: shaderUUID, dataJSON: {albedo: [1,0,0], roughness:0.5, metallic:0.5}, constantsJSON: {"MATERIAL_TRIPLANAR": triplanar}});
+			const template = new SDK3DVerse.EntityTemplate();
 
-	const size = 5;
-	const distance = 2.0;
-
-	/*
-	let templates = new Array(size * size).fill(entityTemplate);
-	let entities = await SDK3DVerse.engineAPI.instantiateEntities(null, templates);
-	*/
-
-	for (let i = 0; i < size; i++) {
-		let roughness = i / (size - 1);
-
-		for (let j = 0; j < size; j++) {
-			let metalness = j / (size - 1);
-
-			let entity = await entityTemplate.instantiateTransientEntity(`mat_${i}_${j}`, null, true);
-
-			entity.setGlobalTransform({
-				position: [(j - (size * 0.5) + 0.5) * distance, 0, (i - (size * 0.5) + 0.5) * distance],
+			template.attachComponent('debug_name', {value: `mat_${i}_${j}`});
+			template.attachComponent('mesh_ref', {value: matrixMeshUUID});
+			template.attachComponent('material', {shaderRef: shaderUUID, dataJSON: {albedo: [1,0,0], roughness: roughness, metallic: metallic}, constantsJSON: {"MATERIAL_TRIPLANAR": triplanar}});
+			template.attachComponent('local_transform', {
+				position: [
+					positionOffset[0] + (j - (matrixSize * 0.5) + 0.5) * matrixSpacing,
+					positionOffset[1],
+					positionOffset[2] + (i - (matrixSize * 0.5) + 0.5) * matrixSpacing],
 				orientation: [0, 0, 0, 1],
 				scale: [1, 1, 1]
 			});
 
-			const material = entity.getComponent('material');
-			material.dataJSON.roughness = roughness;
-			material.dataJSON.metallic = metalness;
-			entity.setComponent('material', material);
+			templates.push(template);
 		}
 	}
+
+	await SDK3DVerse.EntityTemplate.instantiateEntities(null, templates);
 }
